@@ -25,6 +25,36 @@ export class Timepicker {
   dragCapturedFrom = 0;
   dragCapturedTo = 0;
 
+  init = (
+    element: HTMLElement,
+    label: string,
+    values: TimeRange[],
+    onChange: (ranges: TimeRange[]) => void,
+    options?: {
+      step?: number;
+      total?: number;
+      maxRangesAmount?: number;
+    }
+  ) => {
+    if (options) {
+      this.options = { ...this.options, ...options };
+    }
+    this.onChange = onChange;
+    const timepicker = this.createTimepicker(label);
+    element.appendChild(timepicker);
+    this.boxElement = timepicker.querySelector(
+      ".selector-box"
+    ) as HTMLDivElement;
+    this.boxElement.addEventListener("pointerdown", this.handleBoxClick);
+    values.forEach(range => {
+      const rangeEl = this.createRange();
+      this.boxElement!.appendChild(rangeEl);
+      this.rangeEls.push(rangeEl);
+    });
+    this.ranges = values;
+    this.update();
+  };
+
   onChange: (ranges: TimeRange[]) => void = () => 0;
 
   handleValueChange = (index: number, value: TimeRange) => {
@@ -52,6 +82,7 @@ export class Timepicker {
       return;
     }
     const index = parseInt(rangeEl.dataset.index!);
+    console.log(index, this.ranges);
     const { fromTime, toTime } = this.ranges[index];
     rangeEl.style.width =
       ((toTime - fromTime) * 100) / this.options.total + "%";
@@ -160,34 +191,7 @@ export class Timepicker {
     });
   };
 
-  init = (
-    element: HTMLElement,
-    label: string,
-    values: TimeRange[],
-    onChange: (ranges: TimeRange[]) => void,
-    options?: {
-      step?: number;
-      total?: number;
-      maxRangesAmount?: number;
-    }
-  ) => {
-    const id = "TimePicker-" + Math.random().toString();
-    if (options) {
-      this.options = { ...this.options, ...options };
-    }
-    this.onChange = onChange;
-    this.ranges = values;
-    const timepicker = this.createTimepicker(label, id);
-    element.appendChild(timepicker);
-    setTimeout(() => {
-      this.boxElement = timepicker.querySelector(
-        ".selector-box"
-      ) as HTMLDivElement;
-      this.boxElement.addEventListener("pointerdown", this.handleBoxClick);
-    }, 0);
-  };
-
-  createTimepicker = (label: string, id: string) => {
+  createTimepicker = (label: string) => {
     const timepickerEl = document.createElement("div"),
       head = document.head || document.getElementsByTagName("head")[0],
       link = document.createElement("link");
@@ -199,7 +203,6 @@ export class Timepicker {
     head.appendChild(link);
 
     timepickerEl.className = "TimeRangePicker";
-    timepickerEl.id = id;
     timepickerEl.innerHTML = `
       <label>${label}</label>
       <div class='outer-box'>

@@ -17,7 +17,7 @@ function App() {
     const timepicker5 = new Timepicker();
     const timepicker6 = new Timepicker();
     const timepicker7 = new Timepicker();
-    timepicker1.init(ref.current!, "Monday", [], onChange);
+    timepicker1.init(ref.current!, "Monday", [{fromTime:232,toTime:444}], onChange);
     timepicker2.init(ref.current!, "Tuesday", [], onChange);
     timepicker3.init(ref.current!, "Wednesday", [], onChange);
     timepicker4.init(ref.current!, "Thursday", [], onChange);
