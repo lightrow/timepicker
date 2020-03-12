@@ -17,7 +17,8 @@
 }
 
 .TimeRangePicker .padded-box {
-  padding: 0px 10px;
+  padding: 0 2%;
+  margin: 0 -8px;
 }
 
 .TimeRangePicker .selector-box {
@@ -27,6 +28,7 @@
 }
 
 .TimeRangePicker .header-box {
+  margin: 0 -8px;
   position: relative;
 }
 
@@ -40,7 +42,8 @@
 }
 
 .TimeRangePicker .header-label {
-  width: 25px;
+  width: 100%;
+  display: block;
   font-size: 0.8rem;
   box-sizing: border-box;
   text-align: center;
@@ -56,7 +59,7 @@
 }
 
 .TimeRangePicker .separators {
-  padding: 0 10px;
+  padding: 0 2%;
   position: absolute;
   width: 100%;
   pointer-events: none;
@@ -73,7 +76,7 @@
 .TimeRangePicker .Range {
   user-select: none;
   height: 100%;
-  background: orange;
+  background: linear-gradient(90deg, rgb(255, 123, 0), rgb(255, 81, 0));
   border-radius: 3px;
   color: white;
   position: absolute;

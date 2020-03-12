@@ -1,4 +1,4 @@
-interface TimeRange {
+export interface TimeRange {
   fromTime: number;
   toTime: number;
 }
@@ -10,13 +10,20 @@ for (let i = 0; i <= 24; i++) {
 }
 
 export class Timepicker {
-  ranges: TimeRange[] = [];
-  dragBuffers = [];
-
   options = { step: 15, total: 1440, maxRangesAmount: 2 };
 
-  boxElement?: HTMLDivElement;
+  ranges: TimeRange[] = [];
+
+  dragBuffer = 0;
+  lastX = 0;
   initialMouseX = 0;
+
+  rangeEls: HTMLDivElement[] = [];
+  draggingEl?: HTMLDivElement;
+  boxElement?: HTMLDivElement;
+
+  dragCapturedFrom = 0;
+  dragCapturedTo = 0;
 
   onChange: (ranges: TimeRange[]) => void = () => 0;
 
@@ -31,26 +38,37 @@ export class Timepicker {
   };
 
   removeRange = (index: number) => {
-    const newRanges = [...this.ranges];
-    newRanges.splice(index, 1);
-    this.setRanges(newRanges);
+    this.ranges.splice(index, 1);
+    const deletedRange = this.rangeEls.splice(index, 1);
+    deletedRange[0].parentElement!.removeChild(deletedRange[0]);
+    this.rangeEls.forEach((rangeEl, index) => {
+      rangeEl.dataset.index = index.toString();
+    });
+    this.update();
   };
 
   handleRangeUpdate = (rangeEl: HTMLDivElement) => {
-    
+    if (!rangeEl) {
+      return;
+    }
+    const index = parseInt(rangeEl.dataset.index!);
+    const { fromTime, toTime } = this.ranges[index];
+    rangeEl.style.width =
+      ((toTime - fromTime) * 100) / this.options.total + "%";
+    rangeEl.style.left = (fromTime * 100) / this.options.total + "%";
+    rangeEl.querySelector(".labels .left")!.innerHTML = convert(fromTime);
+    rangeEl.querySelector(".labels .right")!.innerHTML = convert(toTime);
   };
 
   update = () => {
-    this.ranges.forEach((range, index) => {
-      const rangeEl = this.boxElement!.querySelector(
-        ".range-" + index
-      ) as HTMLDivElement;
+    this.rangeEls.forEach(rangeEl => {
       this.handleRangeUpdate(rangeEl);
     });
   };
 
   setRanges = (ranges: TimeRange[]) => {
     this.ranges = ranges;
+    this.checkOverlap();
     this.update();
   };
 
@@ -64,32 +82,12 @@ export class Timepicker {
     let targetStart = 0;
     if (delta > 0) {
       const deltaPercent = delta / this.boxElement.clientWidth;
-      targetStart = Math.floor(this.options.total * deltaPercent);
+      targetStart = this.options.total * deltaPercent;
       targetStart -= targetStart % this.options.step;
     }
 
     if (this.ranges.length < this.options.maxRangesAmount) {
-      const rangeEl = document.createElement("div");
-      rangeEl.className = "Range range-" + this.ranges.length;
-      rangeEl.innerHTML = `
-        <div class="handles">
-          <div class="left-handle"></div>
-          <div class="right-handle"></div>
-        </div>
-        <div class="labels">
-          <span class="left"></span>
-          <span class="right"></span>
-        </div>
-      `;
-      const leftHandle = rangeEl.querySelector(
-        ".left-handle"
-      ) as HTMLDivElement;
-      const rightHandle = rangeEl.querySelector(
-        ".right-handle"
-      ) as HTMLDivElement;
-
-      leftHandle.addEventListener("pointerdown");
-
+      const rangeEl = this.createRange();
       this.boxElement.appendChild(rangeEl);
       this.setRanges([
         ...this.ranges,
@@ -98,7 +96,27 @@ export class Timepicker {
           toTime: Math.min(targetStart + 15, this.options.total)
         }
       ]);
+      this.draggingEl = rangeEl;
+      this.rangeEls.push(rangeEl);
+      const index = parseInt(this.draggingEl.dataset.index!);
+      this.dragCapturedFrom = this.ranges[index].fromTime;
+      this.dragCapturedTo = this.ranges[index].toTime;
+      this.update();
+      this.lastX = e.clientX;
+      this.dragCapturedFrom = this.ranges[index].fromTime;
+      this.dragCapturedTo = this.ranges[index].toTime;
+
+      document.onpointerup = this.stopDrag;
+      document.onpointermove = this.handleRightDrag;
     }
+  };
+
+  checkDelete = () => {
+    this.ranges.forEach((range, index) => {
+      if (range.toTime - range.fromTime < this.options.step * 4) {
+        this.removeRange(index);
+      }
+    });
   };
 
   checkOverlap = () => {
@@ -107,25 +125,36 @@ export class Timepicker {
         if (key1 === key2) {
           return;
         }
+        const priorityIndex = this.draggingEl
+          ? parseInt(this.draggingEl.dataset.index!)
+          : null;
+
         if (range1.fromTime < range2.toTime && range1.toTime >= range2.toTime) {
-          this.handleValueChange(key1, {
-            toTime: Math.min(
-              this.options.total,
-              range1.toTime + range2.toTime - range1.fromTime
-            ),
-            fromTime: Math.max(0, range2.toTime)
-          });
-        } else if (
-          range2.fromTime < range1.toTime &&
-          range2.toTime >= range1.toTime
-        ) {
-          this.handleValueChange(key2, {
-            toTime: Math.min(
-              this.options.total,
-              range2.toTime + range1.toTime - range2.fromTime
-            ),
-            fromTime: Math.max(0, range1.toTime)
-          });
+          if (priorityIndex === key2) {
+            this.handleValueChange(key1, {
+              toTime: Math.min(
+                this.options.total,
+                range1.toTime + range2.toTime - range1.fromTime
+              ),
+              fromTime: Math.max(0, range2.toTime)
+            });
+          } else if (priorityIndex === key1) {
+            this.handleValueChange(key2, {
+              toTime: Math.min(this.options.total, range1.fromTime),
+              fromTime: Math.max(
+                0,
+                range2.fromTime - (range2.toTime - range1.fromTime)
+              )
+            });
+          } else if (priorityIndex && priorityIndex > key1) {
+            this.handleValueChange(key1, {
+              toTime: Math.min(
+                this.options.total,
+                range1.toTime + range2.toTime - range1.fromTime
+              ),
+              fromTime: Math.max(0, range2.toTime)
+            });
+          }
         }
       });
     });
@@ -137,12 +166,15 @@ export class Timepicker {
     values: TimeRange[],
     onChange: (ranges: TimeRange[]) => void,
     options?: {
-      step: number;
-      total: number;
-      maxRangesAmount: number;
+      step?: number;
+      total?: number;
+      maxRangesAmount?: number;
     }
   ) => {
     const id = "TimePicker-" + Math.random().toString();
+    if (options) {
+      this.options = { ...this.options, ...options };
+    }
     this.onChange = onChange;
     this.ranges = values;
     const timepicker = this.createTimepicker(label, id);
@@ -196,83 +228,113 @@ export class Timepicker {
     return timepickerEl;
   };
 
-  createRanges = () => {
-    this.ranges.forEach(range => {
-      const rangeEl = document.createElement("div");
-    });
+  createRange = () => {
+    const rangeEl = document.createElement("div");
+    rangeEl.className = "Range range-" + this.ranges.length;
+    rangeEl.dataset.index = this.ranges.length.toString();
+    rangeEl.innerHTML = `
+        <div class="handles">
+          <div class="left-handle"></div>
+          <div class="right-handle"></div>
+        </div>
+        <div class="labels">
+          <span class="left"></span>
+          <span class="right"></span>
+        </div>
+      `;
+    const leftHandle = rangeEl.querySelector(".left-handle") as HTMLDivElement;
+    const rightHandle = rangeEl.querySelector(
+      ".right-handle"
+    ) as HTMLDivElement;
+
+    leftHandle.addEventListener("pointerdown", this.handleLeftDragStart);
+    rightHandle.addEventListener("pointerdown", this.handleRightDragStart);
+    rangeEl.addEventListener("pointerdown", this.handleMidDragStart);
+    return rangeEl;
   };
 
   stopDrag = (e?: MouseEvent) => {
     this.dragBuffer = 0;
     document.onpointermove = null;
-    this.dragging = false;
-
-    if (delta < step * 2 && !dragging) {
-      removeRange(id);
-      return null;
-    }
+    this.draggingEl = undefined;
+    this.checkDelete();
   };
 
-  handleLeftDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+  handleLeftDragStart = (event: MouseEvent) => {
     event.stopPropagation();
-    this.dragging = true;
+    this.draggingEl = (event.currentTarget as HTMLDivElement).parentElement!
+      .parentElement as HTMLDivElement;
+    this.lastX = event.clientX;
+    const index = parseInt(this.draggingEl.dataset.index!);
+    this.dragCapturedFrom = this.ranges[index].fromTime;
+    this.dragCapturedTo = this.ranges[index].toTime;
 
-    document.onpointerup = stopDrag;
-    document.onpointermove = handleLeftDrag;
-    lastX.current = event.clientX;
+    document.onpointerup = this.stopDrag;
+    document.onpointermove = this.handleLeftDrag;
   };
 
-  handleRightDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+  handleRightDragStart = (event: MouseEvent) => {
     event.stopPropagation();
-    setDragging(true);
-    document.onpointerup = stopDrag;
-    document.onpointermove = handleRightDrag;
-    lastX.current = event.clientX;
+    this.draggingEl = (event.currentTarget as HTMLDivElement).parentElement!
+      .parentElement as HTMLDivElement;
+    this.lastX = event.clientX;
+    const index = parseInt(this.draggingEl.dataset.index!);
+    this.dragCapturedFrom = this.ranges[index].fromTime;
+    this.dragCapturedTo = this.ranges[index].toTime;
+
+    document.onpointerup = this.stopDrag;
+    document.onpointermove = this.handleRightDrag;
   };
 
-  handleMidDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+  handleMidDragStart = (event: MouseEvent) => {
     event.stopPropagation();
-    event.nativeEvent.stopPropagation();
-    event.nativeEvent.stopImmediatePropagation();
-    setDragging(true);
-    document.onpointerup = stopDrag;
-    document.onpointermove = handleMidDrag;
-    lastX.current = event.clientX;
+    this.draggingEl = event.currentTarget as HTMLDivElement;
+    this.lastX = event.clientX;
+    const index = parseInt(this.draggingEl.dataset.index!);
+    this.dragCapturedFrom = this.ranges[index].fromTime;
+    this.dragCapturedTo = this.ranges[index].toTime;
+
+    document.onpointerup = this.stopDrag;
+    document.onpointermove = this.handleMidDrag;
   };
 
   handleLeftDrag = (event: MouseEvent) => {
     const isHeldDown =
       event.buttons === undefined ? event.which === 1 : event.buttons === 1;
     if (!isHeldDown) {
-      stopDrag();
+      this.stopDrag();
       return;
     }
-    const el = ref.current!;
-    const delta = event.clientX - lastX.current;
-    const deltaPercent = Math.floor(
-      (delta / el.parentElement!.clientWidth) * 100
-    );
 
-    let deltaValue = (deltaPercent / 100) * totalValue;
-    deltaValue = deltaValue - (deltaValue % step);
+    const el = this.draggingEl;
+
+    if (!el) {
+      return;
+    }
+    const index = parseInt(el.dataset.index!);
+    const delta = event.clientX - this.lastX;
+    const deltaPercent = (delta / el.parentElement!.clientWidth) * 100;
+
+    let deltaValue = (deltaPercent / 100) * this.options.total;
+    deltaValue = deltaValue - (deltaValue % this.options.step);
     if (
-      deltaValue - dragBuffer.current < step &&
-      deltaValue - dragBuffer.current > -step
+      deltaValue - this.dragBuffer < this.options.step &&
+      deltaValue - this.dragBuffer > -this.options.step
     ) {
       return;
     }
-    dragBuffer.current = deltaValue;
-    let newStart = fromTime;
-    let newEnd = toTime;
+    this.dragBuffer = deltaValue;
+    let newStart = this.dragCapturedFrom;
+    let newEnd = this.dragCapturedTo;
 
-    if (toTime - (newStart + deltaValue) < 0) {
-      newStart = toTime;
-      newEnd = newEnd + deltaValue - (toTime - fromTime);
+    if (newEnd - (newStart + deltaValue) < 0) {
+      newStart = newEnd;
+      newEnd = newEnd + deltaValue - (newEnd - this.dragCapturedFrom);
     } else {
       newStart += deltaValue;
     }
 
-    onValueChange(id, { start: newStart, end: newEnd });
+    this.handleValueChange(index, { fromTime: newStart, toTime: newEnd });
   };
 
   handleRightDrag = (event: MouseEvent) => {
@@ -280,68 +342,74 @@ export class Timepicker {
       event.buttons === undefined ? event.which === 1 : event.buttons === 1;
 
     if (!isHeldDown) {
-      stopDrag();
+      this.stopDrag();
       return;
     }
 
-    const el = ref.current!;
-    const delta = event.clientX - lastX.current;
+    const el = this.draggingEl;
+    if (!el) {
+      return;
+    }
+
+    const index = parseInt(el.dataset.index!);
+    const delta = event.clientX - this.lastX;
     const deltaPercent = (delta / el.parentElement!.clientWidth) * 100;
 
-    let deltaValue = (deltaPercent / 100) * totalValue;
-    deltaValue = deltaValue - (deltaValue % step);
+    let deltaValue = (deltaPercent / 100) * this.options.total;
+    deltaValue = deltaValue - (deltaValue % this.options.step);
     if (
-      deltaValue - dragBuffer.current < step &&
-      deltaValue - dragBuffer.current > -step
+      deltaValue - this.dragBuffer < this.options.step &&
+      deltaValue - this.dragBuffer > -this.options.step
     ) {
       return;
     }
-    dragBuffer.current = deltaValue;
+    this.dragBuffer = deltaValue;
+    let newStart = this.dragCapturedFrom;
+    let newEnd = this.dragCapturedTo;
 
-    let newStart = fromTime;
-    let newEnd = toTime;
-
-    if (newEnd + deltaValue - fromTime < 0) {
-      newStart = newStart + deltaValue - (fromTime - toTime);
-      newEnd = fromTime;
+    if (newEnd + deltaValue - newStart < 0) {
+      newStart = newStart + deltaValue - (newStart - newEnd);
+      newEnd = this.dragCapturedFrom;
     } else {
       newEnd += deltaValue;
     }
 
-    onValueChange(id, { start: newStart, end: newEnd });
+    this.handleValueChange(index, { fromTime: newStart, toTime: newEnd });
   };
 
   handleMidDrag = (event: MouseEvent) => {
     const isHeldDown =
       event.buttons === undefined ? event.which === 1 : event.buttons === 1;
     if (!isHeldDown) {
-      stopDrag();
+      this.stopDrag();
       return;
     }
 
-    const el = ref.current!;
-    const delta = event.clientX - lastX.current;
-    const deltaPercent = Math.floor(
-      (delta / el.parentElement!.clientWidth) * 100
-    );
+    const el = this.draggingEl;
+    if (!el) {
+      return;
+    }
+    const index = parseInt(el.dataset.index!);
+    const delta = event.clientX - this.lastX;
+    const deltaPercent = (delta / el.parentElement!.clientWidth) * 100;
 
-    let deltaValue = (deltaPercent / 100) * totalValue;
-    deltaValue = deltaValue - (deltaValue % step);
+    let deltaValue = (deltaPercent / 100) * this.options.total;
+    deltaValue = deltaValue - (deltaValue % this.options.step);
     if (
-      deltaValue - dragBuffer.current < step &&
-      deltaValue - dragBuffer.current > -step
+      deltaValue - this.dragBuffer < this.options.step &&
+      deltaValue - this.dragBuffer > -this.options.step
     ) {
       return;
     }
-    dragBuffer.current = deltaValue;
-    const newStart = fromTime + deltaValue;
-    const newEnd = toTime + deltaValue;
+    this.dragBuffer = deltaValue;
+    let newStart = this.dragCapturedFrom + deltaValue;
+    let newEnd = this.dragCapturedTo + deltaValue;
 
-    onValueChange(id, { start: newStart, end: newEnd });
+    this.handleValueChange(index, { fromTime: newStart, toTime: newEnd });
   };
 }
 
-export function getOffset(el: HTMLElement): { top: number; left: number } {
+const getOffset = (el: HTMLElement): { top: number; left: number } => {
   let X = 0;
   let Y = 0;
   while (el && !isNaN(el.offsetLeft) && !isNaN(el.offsetTop)) {
@@ -350,4 +418,10 @@ export function getOffset(el: HTMLElement): { top: number; left: number } {
     el = el.offsetParent as HTMLElement;
   }
   return { top: Y, left: X };
-}
+};
+
+const convert = (n: number) => {
+  const hours = `0${((n / 60) ^ 0) % 24}`.slice(-2);
+  const minutes = ("0" + (n % 60)).slice(-2);
+  return hours + ":" + minutes;
+};
