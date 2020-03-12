@@ -11,6 +11,8 @@ for (let i = 0; i <= 24; i++) {
 
 export class Timepicker {
   ranges: TimeRange[] = [];
+  dragBuffers = [];
+
   options = { step: 15, total: 1440, maxRangesAmount: 2 };
 
   boxElement?: HTMLDivElement;
@@ -34,15 +36,21 @@ export class Timepicker {
     this.setRanges(newRanges);
   };
 
+  handleRangeUpdate = (rangeEl: HTMLDivElement) => {
+    
+  };
+
   update = () => {
     this.ranges.forEach((range, index) => {
-      const rangeEl = this.boxElement!.querySelector("#Range-" + index);
+      const rangeEl = this.boxElement!.querySelector(
+        ".range-" + index
+      ) as HTMLDivElement;
+      this.handleRangeUpdate(rangeEl);
     });
   };
 
   setRanges = (ranges: TimeRange[]) => {
     this.ranges = ranges;
-    console.log(this.ranges);
     this.update();
   };
 
@@ -50,7 +58,7 @@ export class Timepicker {
     if (!this.boxElement) {
       return;
     }
-    console.log(e.target);
+
     const delta = e.clientX - getOffset(this.boxElement).left;
     this.initialMouseX = e.clientX;
     let targetStart = 0;
@@ -62,8 +70,7 @@ export class Timepicker {
 
     if (this.ranges.length < this.options.maxRangesAmount) {
       const rangeEl = document.createElement("div");
-      rangeEl.className = "Range";
-      rangeEl.id = "Range-" + this.ranges.length;
+      rangeEl.className = "Range range-" + this.ranges.length;
       rangeEl.innerHTML = `
         <div class="handles">
           <div class="left-handle"></div>
@@ -74,6 +81,16 @@ export class Timepicker {
           <span class="right"></span>
         </div>
       `;
+      const leftHandle = rangeEl.querySelector(
+        ".left-handle"
+      ) as HTMLDivElement;
+      const rightHandle = rangeEl.querySelector(
+        ".right-handle"
+      ) as HTMLDivElement;
+
+      leftHandle.addEventListener("pointerdown");
+
+      this.boxElement.appendChild(rangeEl);
       this.setRanges([
         ...this.ranges,
         {
@@ -81,7 +98,6 @@ export class Timepicker {
           toTime: Math.min(targetStart + 15, this.options.total)
         }
       ]);
-      this.boxElement.appendChild(rangeEl);
     }
   };
 
@@ -184,6 +200,144 @@ export class Timepicker {
     this.ranges.forEach(range => {
       const rangeEl = document.createElement("div");
     });
+  };
+
+  stopDrag = (e?: MouseEvent) => {
+    this.dragBuffer = 0;
+    document.onpointermove = null;
+    this.dragging = false;
+
+    if (delta < step * 2 && !dragging) {
+      removeRange(id);
+      return null;
+    }
+  };
+
+  handleLeftDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    this.dragging = true;
+
+    document.onpointerup = stopDrag;
+    document.onpointermove = handleLeftDrag;
+    lastX.current = event.clientX;
+  };
+
+  handleRightDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    setDragging(true);
+    document.onpointerup = stopDrag;
+    document.onpointermove = handleRightDrag;
+    lastX.current = event.clientX;
+  };
+
+  handleMidDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    event.nativeEvent.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation();
+    setDragging(true);
+    document.onpointerup = stopDrag;
+    document.onpointermove = handleMidDrag;
+    lastX.current = event.clientX;
+  };
+
+  handleLeftDrag = (event: MouseEvent) => {
+    const isHeldDown =
+      event.buttons === undefined ? event.which === 1 : event.buttons === 1;
+    if (!isHeldDown) {
+      stopDrag();
+      return;
+    }
+    const el = ref.current!;
+    const delta = event.clientX - lastX.current;
+    const deltaPercent = Math.floor(
+      (delta / el.parentElement!.clientWidth) * 100
+    );
+
+    let deltaValue = (deltaPercent / 100) * totalValue;
+    deltaValue = deltaValue - (deltaValue % step);
+    if (
+      deltaValue - dragBuffer.current < step &&
+      deltaValue - dragBuffer.current > -step
+    ) {
+      return;
+    }
+    dragBuffer.current = deltaValue;
+    let newStart = fromTime;
+    let newEnd = toTime;
+
+    if (toTime - (newStart + deltaValue) < 0) {
+      newStart = toTime;
+      newEnd = newEnd + deltaValue - (toTime - fromTime);
+    } else {
+      newStart += deltaValue;
+    }
+
+    onValueChange(id, { start: newStart, end: newEnd });
+  };
+
+  handleRightDrag = (event: MouseEvent) => {
+    const isHeldDown =
+      event.buttons === undefined ? event.which === 1 : event.buttons === 1;
+
+    if (!isHeldDown) {
+      stopDrag();
+      return;
+    }
+
+    const el = ref.current!;
+    const delta = event.clientX - lastX.current;
+    const deltaPercent = (delta / el.parentElement!.clientWidth) * 100;
+
+    let deltaValue = (deltaPercent / 100) * totalValue;
+    deltaValue = deltaValue - (deltaValue % step);
+    if (
+      deltaValue - dragBuffer.current < step &&
+      deltaValue - dragBuffer.current > -step
+    ) {
+      return;
+    }
+    dragBuffer.current = deltaValue;
+
+    let newStart = fromTime;
+    let newEnd = toTime;
+
+    if (newEnd + deltaValue - fromTime < 0) {
+      newStart = newStart + deltaValue - (fromTime - toTime);
+      newEnd = fromTime;
+    } else {
+      newEnd += deltaValue;
+    }
+
+    onValueChange(id, { start: newStart, end: newEnd });
+  };
+
+  handleMidDrag = (event: MouseEvent) => {
+    const isHeldDown =
+      event.buttons === undefined ? event.which === 1 : event.buttons === 1;
+    if (!isHeldDown) {
+      stopDrag();
+      return;
+    }
+
+    const el = ref.current!;
+    const delta = event.clientX - lastX.current;
+    const deltaPercent = Math.floor(
+      (delta / el.parentElement!.clientWidth) * 100
+    );
+
+    let deltaValue = (deltaPercent / 100) * totalValue;
+    deltaValue = deltaValue - (deltaValue % step);
+    if (
+      deltaValue - dragBuffer.current < step &&
+      deltaValue - dragBuffer.current > -step
+    ) {
+      return;
+    }
+    dragBuffer.current = deltaValue;
+    const newStart = fromTime + deltaValue;
+    const newEnd = toTime + deltaValue;
+
+    onValueChange(id, { start: newStart, end: newEnd });
   };
 }
 
