@@ -49,7 +49,7 @@
   }
 
   days.forEach((day, index) => {
-    const timepicker = new RangePicker();
+    const timepicker = new RangePicker.RangePicker();
     timepicker.init(container, day, values[index], function (newRanges) {
       values[index] = newRanges;
       console.log(values);

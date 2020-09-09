@@ -1,26 +1,52 @@
-export interface TimeRange {
+interface ValueRange {
   fromTime: number;
   toTime: number;
 }
 
-const hours: number[] = [];
+// default separators
+const hours: (string | number)[] = [];
 
 for (let i = 0; i <= 24; i++) {
   hours.push(i);
 }
 
-export class Timepicker {
-  options = { step: 15, total: 1440, maxRangesAmount: 5 };
+// default convert function for range labels
+const convert = (n: number) => {
+  const hours = `0${((n / 60) ^ 0) % 24}`.slice(-2);
+  const minutes = ("0" + (n % 60)).slice(-2);
+  return hours + ":" + minutes;
+};
 
-  ranges: TimeRange[] = [];
+interface PickerOptions {
+  readOnly?: boolean;
+  step: number;
+  total: number;
+  maxRangesAmount: number;
+  separators: (string | number)[];
+  convertFunc: (val: any) => string;
+}
 
-  focusedRange?: HTMLDivElement;
+class RangePicker {
+  options: PickerOptions = {
+    readOnly: false,
+    step: 15,
+    total: 1440,
+    maxRangesAmount: 2,
+    separators: hours,
+    convertFunc: convert
+  };
+
+  ranges: ValueRange[] = [];
+
+  isChanged = false;
+  label?: string;
 
   dragBuffer = 0;
   lastX = 0;
   initialMouseX = 0;
 
-  timepickerEl?: HTMLDivElement;
+  rangePicker?: HTMLDivElement;
+
   rangeEls: HTMLDivElement[] = [];
   draggingEl?: HTMLDivElement;
   boxElement?: HTMLDivElement;
@@ -31,94 +57,97 @@ export class Timepicker {
   init = (
     element: HTMLElement,
     label: string,
-    values: TimeRange[],
-    onChange: (ranges: TimeRange[]) => void,
-    options?: {
-      step?: number;
-      total?: number;
-      maxRangesAmount?: number;
-    }
+    values: ValueRange[],
+    onChange: (ranges: ValueRange[]) => void,
+    options?: PickerOptions
   ) => {
     if (options) {
       this.options = { ...this.options, ...options };
     }
+    this.label = label;
     this.onChange = onChange;
-    this.timepickerEl = this.createTimepicker(label);
-    element.appendChild(this.timepickerEl);
-    this.boxElement = this.timepickerEl.querySelector(
+    const rangePicker = this.createRangePicker(label);
+    this.rangePicker = rangePicker;
+    element.appendChild(rangePicker);
+    this.boxElement = rangePicker.querySelector(
       ".selector-box"
     ) as HTMLDivElement;
     this.boxElement.addEventListener("pointerdown", this.handleBoxClick);
-    values.forEach((range) => {
+    this.ranges = values;
+    values.forEach(range => {
       const rangeEl = this.createRange();
       this.boxElement!.appendChild(rangeEl);
       this.rangeEls.push(rangeEl);
     });
-    this.ranges = values;
+
     this.update();
   };
 
-  onChange: (ranges: TimeRange[]) => void = () => 0;
+  toggleReadOnly = (readOnly?: boolean) => {
+    this.options.readOnly =
+      readOnly !== undefined ? readOnly : !this.options.readOnly;
+    const outerBox = this.rangePicker!.querySelector(".outer-box")!;
+    if (this.options.readOnly && !outerBox.classList.contains("disabled")) {
+      outerBox.classList.add("disabled");
+    } else if (
+      !this.options.readOnly &&
+      outerBox.classList.contains("disabled")
+    ) {
+      outerBox.classList.remove("disabled");
+    }
+  };
 
-  handleValueChange = (index: number, value: TimeRange) => {
+  onChange: (ranges: ValueRange[]) => void = () => 0;
+
+  handleValueChange = (index: number, value: ValueRange) => {
+    this.isChanged = true;
     const newRanges = [...this.ranges];
     newRanges[index] = {
       fromTime: Math.max(value.fromTime, 0),
-      toTime: Math.min(value.toTime, this.options.total),
+      toTime: Math.min(value.toTime, this.options.total)
     };
+    this.onChange(newRanges);
     this.setRanges(newRanges);
-    this.update();
   };
 
-  removeRange = async (index: number) => {
+  removeRange = (index: number) => {
     this.ranges.splice(index, 1);
     const deletedRange = this.rangeEls.splice(index, 1);
-    if (!deletedRange[0]) {
-      return;
-    }
     deletedRange[0].parentElement!.removeChild(deletedRange[0]);
     this.rangeEls.forEach((rangeEl, index) => {
       rangeEl.dataset.index = index.toString();
     });
+    this.onChange(this.ranges);
+    this.update();
   };
 
   handleRangeUpdate = (rangeEl: HTMLDivElement) => {
+    if (!rangeEl) {
+      return;
+    }
     const index = parseInt(rangeEl.dataset.index!);
-    const { fromTime, toTime } = this.ranges[index];
+    const { fromTime: fromTime, toTime: toTime } = this.ranges[index];
     rangeEl.style.width =
       ((toTime - fromTime) * 100) / this.options.total + "%";
     rangeEl.style.left = (fromTime * 100) / this.options.total + "%";
-    rangeEl.querySelector(".labels .left")!.innerHTML = convert(fromTime);
-    rangeEl.querySelector(".labels .right")!.innerHTML = convert(toTime);
+    rangeEl.querySelector(
+      ".labels .left"
+    )!.innerHTML = this.options.convertFunc(fromTime);
+    rangeEl.querySelector(
+      ".labels .right"
+    )!.innerHTML = this.options.convertFunc(toTime);
   };
 
   update = () => {
-    const allGood = this.checkOverlap();
-    if (allGood) {
-      this.checkDelete();
-    } else {
-      return;
-    }
-    this.rangeEls.forEach((rangeEl) => {
+    this.rangeEls.forEach(rangeEl => {
       this.handleRangeUpdate(rangeEl);
     });
-    this.onChange(this.ranges);
-    if (this.focusedRange) {
-      this.timepickerEl!.querySelector(
-        ".from-value"
-      )!.innerHTML = this.focusedRange.querySelector(
-        ".labels .left"
-      )!.innerHTML;
-      this.timepickerEl!.querySelector(
-        ".to-value"
-      )!.innerHTML = this.focusedRange.querySelector(
-        ".labels .right"
-      )!.innerHTML;
-    }
   };
 
-  setRanges = (ranges: TimeRange[]) => {
+  setRanges = (ranges: ValueRange[]) => {
     this.ranges = ranges;
+    this.checkOverlap();
+    this.update();
   };
 
   handleBoxClick = (e: PointerEvent) => {
@@ -138,26 +167,21 @@ export class Timepicker {
     if (this.ranges.length < this.options.maxRangesAmount) {
       const rangeEl = this.createRange();
       this.boxElement.appendChild(rangeEl);
-      this.setRanges([
-        ...this.ranges,
-        {
-          fromTime: Math.max(0, targetStart - 45),
-          toTime: Math.min(targetStart + 15, this.options.total),
-        },
-      ]);
       this.draggingEl = rangeEl;
-      setTimeout(() => {
-        rangeEl.focus();
-      }, 0);
-
       this.rangeEls.push(rangeEl);
       const index = parseInt(this.draggingEl.dataset.index!);
-      this.dragCapturedFrom = this.ranges[index].fromTime;
-      this.dragCapturedTo = this.ranges[index].toTime;
-      this.lastX = e.clientX;
+
+      this.handleValueChange(index, {
+        fromTime: Math.max(0, targetStart - 45),
+        toTime: Math.min(targetStart + 15, this.options.total)
+      });
+
       this.dragCapturedFrom = this.ranges[index].fromTime;
       this.dragCapturedTo = this.ranges[index].toTime;
       this.update();
+      this.lastX = e.clientX;
+      this.dragCapturedFrom = this.ranges[index].fromTime;
+      this.dragCapturedTo = this.ranges[index].toTime;
 
       document.onpointerup = this.stopDrag;
       document.onpointermove = this.handleRightDrag;
@@ -166,107 +190,73 @@ export class Timepicker {
 
   checkDelete = () => {
     this.ranges.forEach((range, index) => {
-      if ((this.draggingEl?.dataset.index as any) === index.toString()) {
-        return;
-      }
-      if (range.toTime - range.fromTime < this.options.step * 2) {
+      if (range.toTime - range.fromTime < this.options.step * 4) {
         this.removeRange(index);
       }
     });
   };
 
-  shiftDirection = "";
-
   checkOverlap = () => {
-    let allGood = true;
-    for (const [key1, range1] of this.ranges.entries()) {
-      for (const [key2, range2] of this.ranges.entries()) {
-        if (key1 !== key2) {
-          const unmovedKey = this.draggingEl
-            ? parseInt(this.draggingEl.dataset.index!)
-            : null;
+    this.ranges.forEach((range1, key1) => {
+      this.ranges.forEach((range2, key2) => {
+        if (key1 === key2) {
+          return;
+        }
+        const priorityIndex = this.draggingEl
+          ? parseInt(this.draggingEl.dataset.index!)
+          : null;
 
-          if (
-            range1.fromTime < range2.toTime &&
-            range1.toTime > range2.toTime
-          ) {
-            if (unmovedKey === key2) {
-              this.shiftDirection = "right";
-              this.handleValueChange(key1, {
-                toTime: Math.min(
-                  this.options.total,
-                  range1.toTime + range2.toTime - range1.fromTime
-                ),
-                fromTime: Math.max(0, range2.toTime),
-              });
-            } else if (unmovedKey === key1) {
-              this.shiftDirection = "left";
-              this.handleValueChange(key2, {
-                toTime: Math.min(this.options.total, range1.fromTime),
-                fromTime: Math.max(
-                  0,
-                  range2.fromTime - (range2.toTime - range1.fromTime)
-                ),
-              });
-            } else if (this.shiftDirection === "right") {
-              this.handleValueChange(key1, {
-                toTime: Math.min(
-                  this.options.total,
-                  range1.toTime + range2.toTime - range1.fromTime
-                ),
-                fromTime: Math.max(0, range2.toTime),
-              });
-            } else {
-              this.handleValueChange(key2, {
-                toTime: Math.min(this.options.total, range1.fromTime),
-                fromTime: Math.max(
-                  0,
-                  range2.fromTime - (range2.toTime - range1.fromTime)
-                ),
-              });
-            }
-            allGood = false;
+        if (range1.fromTime < range2.toTime && range1.toTime >= range2.toTime) {
+          if (priorityIndex === key2) {
+            this.handleValueChange(key1, {
+              toTime: Math.min(
+                this.options.total,
+                range1.toTime + range2.toTime - range1.fromTime
+              ),
+              fromTime: Math.max(0, range2.toTime)
+            });
+          } else if (priorityIndex === key1) {
+            this.handleValueChange(key2, {
+              toTime: Math.min(this.options.total, range1.fromTime),
+              fromTime: Math.max(
+                0,
+                range2.fromTime - (range2.toTime - range1.fromTime)
+              )
+            });
+          } else if (priorityIndex && priorityIndex > key1) {
+            this.handleValueChange(key1, {
+              toTime: Math.min(
+                this.options.total,
+                range1.toTime + range2.toTime - range1.fromTime
+              ),
+              fromTime: Math.max(0, range2.toTime)
+            });
           }
         }
-      }
-    }
-    // this.ranges.forEach((range1, key1) => {
-    //   this.ranges.forEach((range2, key2) => {
-
-    //   });
-    // });
-    console.log(allGood);
-    return allGood;
+      });
+    });
   };
 
-  createTimepicker = (label: string) => {
-    const timepickerEl = document.createElement("div"),
-      head = document.head || document.getElementsByTagName("head")[0],
-      link = document.createElement("link");
+  createRangePicker = (label: string) => {
+    const rangePickerEl = document.createElement("div");
 
-    link.rel = "stylesheet";
-    link.type = "text/css";
-    link.href = "/timepicker.css";
-
-    head.appendChild(link);
-
-    timepickerEl.className = "TimeRangePicker";
-    timepickerEl.innerHTML = `
+    rangePickerEl.className = "ValueRangePicker";
+    rangePickerEl.innerHTML = `
       <label>${label}</label>
-      <div class='outer-box'>
+      <div class='outer-box${this.options.readOnly ? " disabled" : ""}'>
         <div class="header-box">
           <div class="headers">
-            ${hours
-              .map((hour, index) => {
+            ${this.options.separators
+              .map(label => {
                 return `<div class='header'>
-                  <span class="header-label">${hour}</span>
+                  <span class="header-label">${label}</span>
                 </div>`;
               })
               .join(" ")}
           </div>
           <div class="separators">
-            ${hours
-              .map((hour, index) => {
+            ${this.options.separators
+              .map(() => {
                 return "<div class='separator'></div>";
               })
               .join(" ")}
@@ -275,75 +265,14 @@ export class Timepicker {
         <div class="padded-box">
           <div class="selector-box"></div>
         </div>
-      </div>
-      <div class="popup">
-        <p>From:<span class="from-value"></span></p>
-        <p>To:<span class="to-value"></span></p>
-        <button class="btn-remove">Remove</button>
-      </div>
-      `;
-
-    (timepickerEl.querySelector(
-      ".btn-remove"
-    ) as HTMLButtonElement).onpointerdown = this.handleRemoveDown;
-    (timepickerEl.querySelector(
-      ".btn-remove"
-    ) as HTMLButtonElement).onclick = this.handleRemoveClick;
-
-    return timepickerEl;
-  };
-
-  handleRemoveDown = (e: PointerEvent) => {
-    e.preventDefault();
-    if (this.focusedRange) {
-      this.focusedRange.focus();
-    }
-  };
-
-  handleRemoveClick = (e: MouseEvent) => {
-    if (this.focusedRange) {
-      const idx = this.focusedRange.dataset.index as any;
-      this.removeRange(idx);
-    }
-  };
-
-  handleRangeFocus = (e: FocusEvent) => {
-    if (this.popupCloseTimeout) {
-      clearTimeout(this.popupCloseTimeout);
-    }
-    this.focusedRange = e.target as HTMLDivElement;
-    this.timepickerEl?.querySelector(".popup")?.classList.remove("closing");
-    this.timepickerEl?.querySelector(".popup")?.classList.add("show");
-    this.update();
-  };
-
-  popupCloseTimeout?: NodeJS.Timeout;
-
-  handleRangeBlur = (e: FocusEvent) => {
-    this.focusedRange = undefined;
-    setTimeout(() => {
-      if (!this.focusedRange) {
-        if (this.popupCloseTimeout) {
-          clearTimeout(this.popupCloseTimeout);
-        }
-        this.timepickerEl?.querySelector(".popup")?.classList.add("closing");
-        this.popupCloseTimeout = setTimeout(() => {
-          this.timepickerEl
-            ?.querySelector(".popup")
-            ?.classList.remove("closing");
-          this.timepickerEl?.querySelector(".popup")?.classList.remove("show");
-        }, 400);
-      }
-    }, 0);
+      </div>`;
+    return rangePickerEl;
   };
 
   createRange = () => {
     const rangeEl = document.createElement("div");
-    rangeEl.className = "Range";
-    rangeEl.dataset.index = this.ranges.length.toString();
-    rangeEl.tabIndex = -1;
-    rangeEl.onfocus = this.handleRangeFocus;
-    rangeEl.onblur = this.handleRangeBlur;
+    rangeEl.className = "Range range-" + this.ranges.length;
+    rangeEl.dataset.index = this.rangeEls.length.toString();
     rangeEl.innerHTML = `
         <div class="handles">
           <div class="left-handle"></div>
@@ -370,7 +299,6 @@ export class Timepicker {
     document.onpointermove = null;
     this.draggingEl = undefined;
     this.checkDelete();
-    this.onChange(this.ranges);
   };
 
   handleLeftDragStart = (event: MouseEvent) => {
@@ -533,8 +461,5 @@ const getOffset = (el: HTMLElement): { top: number; left: number } => {
   return { top: Y, left: X };
 };
 
-const convert = (n: number) => {
-  const hours = `0${((n / 60) ^ 0) % 24}`.slice(-2);
-  const minutes = ("0" + (n % 60)).slice(-2);
-  return hours + ":" + minutes;
-};
+
+export default RangePicker
