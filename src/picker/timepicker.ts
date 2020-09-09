@@ -10,14 +10,17 @@ for (let i = 0; i <= 24; i++) {
 }
 
 export class Timepicker {
-  options = { step: 15, total: 1440, maxRangesAmount: 2 };
+  options = { step: 15, total: 1440, maxRangesAmount: 5 };
 
   ranges: TimeRange[] = [];
+
+  focusedRange?: HTMLDivElement;
 
   dragBuffer = 0;
   lastX = 0;
   initialMouseX = 0;
 
+  timepickerEl?: HTMLDivElement;
   rangeEls: HTMLDivElement[] = [];
   draggingEl?: HTMLDivElement;
   boxElement?: HTMLDivElement;
@@ -40,13 +43,13 @@ export class Timepicker {
       this.options = { ...this.options, ...options };
     }
     this.onChange = onChange;
-    const timepicker = this.createTimepicker(label);
-    element.appendChild(timepicker);
-    this.boxElement = timepicker.querySelector(
+    this.timepickerEl = this.createTimepicker(label);
+    element.appendChild(this.timepickerEl);
+    this.boxElement = this.timepickerEl.querySelector(
       ".selector-box"
     ) as HTMLDivElement;
     this.boxElement.addEventListener("pointerdown", this.handleBoxClick);
-    values.forEach(range => {
+    values.forEach((range) => {
       const rangeEl = this.createRange();
       this.boxElement!.appendChild(rangeEl);
       this.rangeEls.push(rangeEl);
@@ -61,28 +64,26 @@ export class Timepicker {
     const newRanges = [...this.ranges];
     newRanges[index] = {
       fromTime: Math.max(value.fromTime, 0),
-      toTime: Math.min(value.toTime, this.options.total)
+      toTime: Math.min(value.toTime, this.options.total),
     };
     this.setRanges(newRanges);
-    this.onChange(newRanges);
+    this.update();
   };
 
-  removeRange = (index: number) => {
+  removeRange = async (index: number) => {
     this.ranges.splice(index, 1);
     const deletedRange = this.rangeEls.splice(index, 1);
+    if (!deletedRange[0]) {
+      return;
+    }
     deletedRange[0].parentElement!.removeChild(deletedRange[0]);
     this.rangeEls.forEach((rangeEl, index) => {
       rangeEl.dataset.index = index.toString();
     });
-    this.update();
   };
 
   handleRangeUpdate = (rangeEl: HTMLDivElement) => {
-    if (!rangeEl) {
-      return;
-    }
     const index = parseInt(rangeEl.dataset.index!);
-    console.log(index, this.ranges);
     const { fromTime, toTime } = this.ranges[index];
     rangeEl.style.width =
       ((toTime - fromTime) * 100) / this.options.total + "%";
@@ -92,15 +93,32 @@ export class Timepicker {
   };
 
   update = () => {
-    this.rangeEls.forEach(rangeEl => {
+    const allGood = this.checkOverlap();
+    if (allGood) {
+      this.checkDelete();
+    } else {
+      return;
+    }
+    this.rangeEls.forEach((rangeEl) => {
       this.handleRangeUpdate(rangeEl);
     });
+    this.onChange(this.ranges);
+    if (this.focusedRange) {
+      this.timepickerEl!.querySelector(
+        ".from-value"
+      )!.innerHTML = this.focusedRange.querySelector(
+        ".labels .left"
+      )!.innerHTML;
+      this.timepickerEl!.querySelector(
+        ".to-value"
+      )!.innerHTML = this.focusedRange.querySelector(
+        ".labels .right"
+      )!.innerHTML;
+    }
   };
 
   setRanges = (ranges: TimeRange[]) => {
     this.ranges = ranges;
-    this.checkOverlap();
-    this.update();
   };
 
   handleBoxClick = (e: PointerEvent) => {
@@ -124,18 +142,22 @@ export class Timepicker {
         ...this.ranges,
         {
           fromTime: Math.max(0, targetStart - 45),
-          toTime: Math.min(targetStart + 15, this.options.total)
-        }
+          toTime: Math.min(targetStart + 15, this.options.total),
+        },
       ]);
       this.draggingEl = rangeEl;
+      setTimeout(() => {
+        rangeEl.focus();
+      }, 0);
+
       this.rangeEls.push(rangeEl);
       const index = parseInt(this.draggingEl.dataset.index!);
       this.dragCapturedFrom = this.ranges[index].fromTime;
       this.dragCapturedTo = this.ranges[index].toTime;
-      this.update();
       this.lastX = e.clientX;
       this.dragCapturedFrom = this.ranges[index].fromTime;
       this.dragCapturedTo = this.ranges[index].toTime;
+      this.update();
 
       document.onpointerup = this.stopDrag;
       document.onpointermove = this.handleRightDrag;
@@ -144,51 +166,77 @@ export class Timepicker {
 
   checkDelete = () => {
     this.ranges.forEach((range, index) => {
-      if (range.toTime - range.fromTime < this.options.step * 4) {
+      if ((this.draggingEl?.dataset.index as any) === index.toString()) {
+        return;
+      }
+      if (range.toTime - range.fromTime < this.options.step * 2) {
         this.removeRange(index);
       }
     });
   };
 
-  checkOverlap = () => {
-    this.ranges.forEach((range1, key1) => {
-      this.ranges.forEach((range2, key2) => {
-        if (key1 === key2) {
-          return;
-        }
-        const priorityIndex = this.draggingEl
-          ? parseInt(this.draggingEl.dataset.index!)
-          : null;
+  shiftDirection = "";
 
-        if (range1.fromTime < range2.toTime && range1.toTime >= range2.toTime) {
-          if (priorityIndex === key2) {
-            this.handleValueChange(key1, {
-              toTime: Math.min(
-                this.options.total,
-                range1.toTime + range2.toTime - range1.fromTime
-              ),
-              fromTime: Math.max(0, range2.toTime)
-            });
-          } else if (priorityIndex === key1) {
-            this.handleValueChange(key2, {
-              toTime: Math.min(this.options.total, range1.fromTime),
-              fromTime: Math.max(
-                0,
-                range2.fromTime - (range2.toTime - range1.fromTime)
-              )
-            });
-          } else if (priorityIndex && priorityIndex > key1) {
-            this.handleValueChange(key1, {
-              toTime: Math.min(
-                this.options.total,
-                range1.toTime + range2.toTime - range1.fromTime
-              ),
-              fromTime: Math.max(0, range2.toTime)
-            });
+  checkOverlap = () => {
+    let allGood = true;
+    for (const [key1, range1] of this.ranges.entries()) {
+      for (const [key2, range2] of this.ranges.entries()) {
+        if (key1 !== key2) {
+          const unmovedKey = this.draggingEl
+            ? parseInt(this.draggingEl.dataset.index!)
+            : null;
+
+          if (
+            range1.fromTime < range2.toTime &&
+            range1.toTime > range2.toTime
+          ) {
+            if (unmovedKey === key2) {
+              this.shiftDirection = "right";
+              this.handleValueChange(key1, {
+                toTime: Math.min(
+                  this.options.total,
+                  range1.toTime + range2.toTime - range1.fromTime
+                ),
+                fromTime: Math.max(0, range2.toTime),
+              });
+            } else if (unmovedKey === key1) {
+              this.shiftDirection = "left";
+              this.handleValueChange(key2, {
+                toTime: Math.min(this.options.total, range1.fromTime),
+                fromTime: Math.max(
+                  0,
+                  range2.fromTime - (range2.toTime - range1.fromTime)
+                ),
+              });
+            } else if (this.shiftDirection === "right") {
+              this.handleValueChange(key1, {
+                toTime: Math.min(
+                  this.options.total,
+                  range1.toTime + range2.toTime - range1.fromTime
+                ),
+                fromTime: Math.max(0, range2.toTime),
+              });
+            } else {
+              this.handleValueChange(key2, {
+                toTime: Math.min(this.options.total, range1.fromTime),
+                fromTime: Math.max(
+                  0,
+                  range2.fromTime - (range2.toTime - range1.fromTime)
+                ),
+              });
+            }
+            allGood = false;
           }
         }
-      });
-    });
+      }
+    }
+    // this.ranges.forEach((range1, key1) => {
+    //   this.ranges.forEach((range2, key2) => {
+
+    //   });
+    // });
+    console.log(allGood);
+    return allGood;
   };
 
   createTimepicker = (label: string) => {
@@ -227,14 +275,75 @@ export class Timepicker {
         <div class="padded-box">
           <div class="selector-box"></div>
         </div>
-      </div>`;
+      </div>
+      <div class="popup">
+        <p>From:<span class="from-value"></span></p>
+        <p>To:<span class="to-value"></span></p>
+        <button class="btn-remove">Remove</button>
+      </div>
+      `;
+
+    (timepickerEl.querySelector(
+      ".btn-remove"
+    ) as HTMLButtonElement).onpointerdown = this.handleRemoveDown;
+    (timepickerEl.querySelector(
+      ".btn-remove"
+    ) as HTMLButtonElement).onclick = this.handleRemoveClick;
+
     return timepickerEl;
+  };
+
+  handleRemoveDown = (e: PointerEvent) => {
+    e.preventDefault();
+    if (this.focusedRange) {
+      this.focusedRange.focus();
+    }
+  };
+
+  handleRemoveClick = (e: MouseEvent) => {
+    if (this.focusedRange) {
+      const idx = this.focusedRange.dataset.index as any;
+      this.removeRange(idx);
+    }
+  };
+
+  handleRangeFocus = (e: FocusEvent) => {
+    if (this.popupCloseTimeout) {
+      clearTimeout(this.popupCloseTimeout);
+    }
+    this.focusedRange = e.target as HTMLDivElement;
+    this.timepickerEl?.querySelector(".popup")?.classList.remove("closing");
+    this.timepickerEl?.querySelector(".popup")?.classList.add("show");
+    this.update();
+  };
+
+  popupCloseTimeout?: NodeJS.Timeout;
+
+  handleRangeBlur = (e: FocusEvent) => {
+    this.focusedRange = undefined;
+    setTimeout(() => {
+      if (!this.focusedRange) {
+        if (this.popupCloseTimeout) {
+          clearTimeout(this.popupCloseTimeout);
+        }
+        this.timepickerEl?.querySelector(".popup")?.classList.add("closing");
+        this.popupCloseTimeout = setTimeout(() => {
+          this.timepickerEl
+            ?.querySelector(".popup")
+            ?.classList.remove("closing");
+          this.timepickerEl?.querySelector(".popup")?.classList.remove("show");
+        }, 400);
+      }
+    }, 0);
   };
 
   createRange = () => {
     const rangeEl = document.createElement("div");
-    rangeEl.className = "Range range-" + this.ranges.length;
+    rangeEl.className = "Range";
     rangeEl.dataset.index = this.ranges.length.toString();
+    rangeEl.tabIndex = -1;
+    rangeEl.onfocus = this.handleRangeFocus;
+    rangeEl.onblur = this.handleRangeBlur;
     rangeEl.innerHTML = `
         <div class="handles">
           <div class="left-handle"></div>
@@ -261,6 +370,7 @@ export class Timepicker {
     document.onpointermove = null;
     this.draggingEl = undefined;
     this.checkDelete();
+    this.onChange(this.ranges);
   };
 
   handleLeftDragStart = (event: MouseEvent) => {

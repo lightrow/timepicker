@@ -6,7 +6,10 @@ import { Timepicker, TimeRange } from "./picker/timepicker";
 function App() {
   const ref = useRef<HTMLDivElement>(null);
   const onChange = (ranges: TimeRange[]) => {
-    console.log(ranges);
+    console.log("CHANGE:")
+    for (const range of ranges) {
+      console.log(range);
+    }
   };
 
   useEffect(() => {
@@ -17,7 +20,12 @@ function App() {
     const timepicker5 = new Timepicker();
     const timepicker6 = new Timepicker();
     const timepicker7 = new Timepicker();
-    timepicker1.init(ref.current!, "Monday", [{fromTime:232,toTime:444}], onChange);
+    timepicker1.init(
+      ref.current!,
+      "Monday",
+      [{ fromTime: 232, toTime: 444 }],
+      onChange
+    );
     timepicker2.init(ref.current!, "Tuesday", [], onChange);
     timepicker3.init(ref.current!, "Wednesday", [], onChange);
     timepicker4.init(ref.current!, "Thursday", [], onChange);

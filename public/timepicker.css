@@ -3,6 +3,10 @@
   user-select: none;
   width: 900px;
   margin: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .TimeRangePicker label {
@@ -73,6 +77,57 @@
   height: 32px;
 }
 
+.TimeRangePicker .popup {
+  position: absolute;
+  background: white;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  width: 250px;
+  align-self: center;
+  top: calc(100% + 10px);
+  animation: fade-in 150ms;
+  z-index: 999;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.TimeRangePicker .popup.show {
+  display: flex;
+}
+
+.TimeRangePicker .popup.closing {
+  animation: fade-out 150ms forwards;
+}
+
+.TimeRangePicker .popup span {
+  margin: 0 5px;
+  font-weight: bold;
+}
+
+.TimeRangePicker .popup button {
+  outline: none;
+  border: none;
+  background: rgb(240, 106, 89);
+  color: white;
+  border-radius: 5px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.TimeRangePicker .popup button:hover {
+  background: rgb(247, 119, 102);
+}
+
+.TimeRangePicker .popup button:active {
+  background: rgb(206, 92, 77);
+}
+
+.TimeRangePicker .popup p {
+  margin: 0;
+}
+
 .TimeRangePicker .Range {
   user-select: none;
   height: 100%;
@@ -83,6 +138,11 @@
   cursor: grab;
   opacity: 0.8;
   overflow: hidden;
+}
+
+.TimeRangePicker .Range:focus {
+  background: linear-gradient(90deg, rgb(255, 0, 0), rgb(255, 81, 0));
+  outline: none;
 }
 
 .TimeRangePicker .Range span {
@@ -116,4 +176,22 @@
 .Range .handles > div {
   width: 20px;
   height: 100%;
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
