@@ -87,8 +87,8 @@
 }
 
 .ValueRangePicker .popup-track {
-  left: 12px;
-  width: calc(100% - 24px);
+  left: 11px;
+  width: calc(100% - 22px);
   position: relative;
   display: none;
   z-index: 9999;
@@ -167,17 +167,18 @@
 .ValueRangePicker .Range {
   user-select: none;
   height: 100%;
-  background: linear-gradient(90deg, rgb(255, 123, 0), rgb(255, 81, 0));
+  background: linear-gradient(90deg, rgb(255, 145, 0), rgb(255, 81, 0));
   border-radius: 3px;
   color: white;
   position: absolute;
   cursor: grab;
   opacity: 0.8;
   overflow: hidden;
+  transition: opacity 150ms;
 }
 
 .ValueRangePicker .Range:focus {
-  background: linear-gradient(90deg, rgb(255, 0, 0), rgb(255, 81, 0));
+  opacity: 1;
   outline: none;
 }
 
@@ -191,6 +192,7 @@
   justify-content: space-between;
   align-items: center;
   height: 100%;
+  pointer-events: none;
 }
 
 .ValueRangePicker .Range .handles {

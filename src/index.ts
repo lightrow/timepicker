@@ -234,6 +234,16 @@ export class RangePicker {
     rangeEl.querySelector(
       ".labels .right"
     )!.innerHTML = this.options.convertFunc(toTime);
+    if (rangeEl.clientWidth < 70) {
+      rangeEl.querySelector(".labels .right")!.style.opacity = 0;
+    } else {
+      rangeEl.querySelector(".labels .right")!.style.opacity = 1;
+    }
+    if (rangeEl.clientWidth < 30) {
+      rangeEl.querySelector(".labels .left")!.style.opacity = 0;
+    } else {
+      rangeEl.querySelector(".labels .left")!.style.opacity = 1;
+    }
   };
 
   setRanges = (ranges: ValueRange[]) => {

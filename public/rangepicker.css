@@ -3,7 +3,6 @@
   user-select: none;
   width: 900px;
   margin: auto;
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -87,30 +86,55 @@
   height: 32px;
 }
 
+.ValueRangePicker .popup-track {
+  left: 11px;
+  width: calc(100% - 22px);
+  position: relative;
+  display: none;
+  z-index: 9999;
+}
+
 .ValueRangePicker .popup {
   position: absolute;
   background: white;
   padding: 10px;
   border-radius: 5px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 -2px 15px rgba(0, 0, 0, 0.15);
   width: 250px;
   align-self: flex-start;
-  top: calc(100% + 10px);
+  top: calc(100% + 5px);
   animation: fade-in 150ms;
-  z-index: 999;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: space-between;
   transform: translateX(-50%);
-  transition: left 200ms;
 }
 
-.ValueRangePicker .popup.show {
-  display: flex;
+.ValueRangePicker .popup.transition {
+  transition: all 150ms;
 }
 
-.ValueRangePicker .popup.closing {
+.ValueRangePicker .popup-track.show {
+  display: block;
+}
+
+.ValueRangePicker .popup-track.closing {
   animation: fade-out 150ms forwards;
+}
+
+.ValueRangePicker .popup-track .arrow {
+  bottom: -5px;
+  z-index: 999;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-width: 10px 10px;
+  border-color: transparent;
+  border-bottom-color: white;
+  border-style: solid;
 }
 
 .ValueRangePicker .popup span {
@@ -143,17 +167,18 @@
 .ValueRangePicker .Range {
   user-select: none;
   height: 100%;
-  background: linear-gradient(90deg, rgb(255, 123, 0), rgb(255, 81, 0));
+  background: linear-gradient(90deg, rgb(255, 145, 0), rgb(255, 81, 0));
   border-radius: 3px;
   color: white;
   position: absolute;
   cursor: grab;
   opacity: 0.8;
   overflow: hidden;
+  transition: opacity 150ms;
 }
 
 .ValueRangePicker .Range:focus {
-  background: linear-gradient(90deg, rgb(255, 0, 0), rgb(255, 81, 0));
+  opacity: 1;
   outline: none;
 }
 
@@ -167,6 +192,7 @@
   justify-content: space-between;
   align-items: center;
   height: 100%;
+  pointer-events: none;
 }
 
 .ValueRangePicker .Range .handles {
