@@ -488,16 +488,15 @@ export class RangePicker {
         if (this.popupCloseTimeout) {
           clearTimeout(this.popupCloseTimeout);
         }
-        this.rangepickerEl
-          ?.querySelector(".popup-track")
-          ?.classList.add("closing");
+        const popupTrack = this.rangepickerEl?.querySelector(".popup-track")!;
+        const popup = popupTrack.querySelector(".popup") as HTMLDivElement;
+        const popupArrow = popupTrack.querySelector(".arrow") as HTMLDivElement;
+        popupTrack?.classList.add("closing");
         this.popupCloseTimeout = setTimeout(() => {
-          this.rangepickerEl
-            ?.querySelector(".popup-track")
-            ?.classList.remove("closing");
-          this.rangepickerEl
-            ?.querySelector(".popup-track")
-            ?.classList.remove("show");
+          popupTrack?.classList.remove("closing");
+          popupTrack?.classList.remove("show");
+          popup.style.left = "";
+          popupArrow.style.left = "";
         }, 400);
       }
     }, 0);
