@@ -108,10 +108,12 @@
   align-items: center;
   justify-content: space-between;
   transform: translateX(-50%);
+  transition: all 150ms cubic-bezier(.12,.63,.16,.98);
+
 }
 
 .ValueRangePicker .popup.transition {
-  transition: all 150ms;
+  transition: all 150ms cubic-bezier(.12,.63,.16,.98);
 }
 
 .ValueRangePicker .popup-track.show {
@@ -123,6 +125,8 @@
 }
 
 .ValueRangePicker .popup-track .arrow {
+  transition: all 150ms cubic-bezier(.12,.63,.16,.98);
+
   bottom: -5px;
   z-index: 999;
   pointer-events: none;

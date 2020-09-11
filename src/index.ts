@@ -289,7 +289,7 @@ export class RangePicker {
     if (rangeEl.clientWidth < 30) {
       leftLabel.style.opacity = "0";
     } else {
-      rightLabel.style.opacity = "1";
+      leftLabel.style.opacity = "1";
     }
   };
 
