@@ -1,20 +1,16 @@
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Range Picker Example</title>
+    <script src="./rangepicker.js"></script>
+    <link rel="stylesheet" href="./rangepicker.css" />
+  </head>
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Range Picker Example</title>
-  <script src='./rangepicker.js'></script>
-  <link rel="stylesheet" href="./rangepicker.css">
-</head>
-
-<body>
-  <div id="RangesContainer"></div>
-  <div id="InfoBox">
-
-  </div>
-</body>
-
+  <body>
+    <div id="RangesContainer"></div>
+    <div id="InfoBox"></div>
+  </body>
 </html>
 
 <script>
@@ -31,7 +27,7 @@
     [{ fromTime: 770, toTime: 990 }],
     [],
     [],
-  ]
+  ];
 
   const days = [
     "Monday",
@@ -40,7 +36,7 @@
     "Thursday",
     "Friday",
     "Saturday",
-    "Sunday"
+    "Sunday",
   ];
 
   function handleValueUpdate(newRanges) {
@@ -48,20 +44,23 @@
   }
 
   days.forEach((day, index) => {
-    const timepicker = new RangePicker.RangePicker();
-    timepicker.init(container, day, values[index], function (newRanges) {
-      values[index] = newRanges;
-    });
+    const timepicker = RangePicker.init(
+      container,
+      day,
+      values[index],
+      function (newRanges) {
+        values[index] = newRanges;
+      }
+    );
     handleOtherStuff(timepicker);
-  })
+  });
 
   function handleOtherStuff(timePicker) {
     timePickers.push(timePicker);
     const infoRow = document.createElement("div");
-    infoRow.innerHTML = `<button onclick="timePickers[${timePickers.length - 1}].toggleReadOnly();">Toggle read-only for ${timePicker.label}</button`
-    infoBox.appendChild(infoRow)
+    infoRow.innerHTML = `<button onclick="timePickers[${
+      timePickers.length - 1
+    }].toggleReadOnly();">Toggle read-only for ${timePicker.label}</button`;
+    infoBox.appendChild(infoRow);
   }
-
-
-
 </script>

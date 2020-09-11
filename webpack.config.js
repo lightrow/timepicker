@@ -1,13 +1,18 @@
 module.exports = {
-  mode: 'development',
-  devtool: 'inline-source-map',
+  entry: "./src/index.ts",
+  output: {
+    filename: "rangepicker.js",
+    path: `${process.cwd()}/dist`,
+    library: "RangePicker",
+  },
+  mode: "development",
+  devtool: "inline-source-map",
   devServer: {
     contentBase: `${process.cwd()}/dist`,
     compress: true,
     port: 3000,
   },
-  watch:true,
-  entry: "./src/index.ts",
+  watch: true,
   module: {
     // Use `ts-loader` on any file that ends in '.ts'
     rules: [
@@ -20,10 +25,5 @@ module.exports = {
   // Bundle '.ts' files as well as '.js' files.
   resolve: {
     extensions: [".ts"],
-  },
-  output: {
-    filename: "rangepicker.js",
-    path: `${process.cwd()}/dist`,
-    library: "RangePicker",
   },
 };

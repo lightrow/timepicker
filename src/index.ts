@@ -26,6 +26,36 @@ const convert = (n: number) => {
   return hours + ":" + minutes;
 };
 
+function debounce(func: () => any, wait: number, immediate?: boolean) {
+  var timeout: number | null;
+  return function (this: any) {
+    var context = this,
+      args = arguments;
+    var later = function () {
+      timeout = null;
+      if (!immediate) func.apply(context, args as any);
+    };
+    var callNow = immediate && !timeout;
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = window.setTimeout(later, wait);
+    if (callNow) func.apply(context, args as any);
+  };
+}
+function throttle(callback: () => any, limit: number) {
+  var waiting = false;
+  return function (this: any) {
+    if (!waiting) {
+      callback.apply(this, arguments as any);
+      waiting = true;
+      setTimeout(function () {
+        waiting = false;
+      }, limit);
+    }
+  };
+}
+
 interface PickerOptions {
   readOnly?: boolean;
   step: number;
@@ -34,6 +64,23 @@ interface PickerOptions {
   separators: (string | number)[];
   convertFunc: (val: any) => string;
 }
+
+export const init = (
+  element: HTMLElement,
+  label: string,
+  values: ValueRange[],
+  onChange: (ranges: ValueRange[]) => void,
+  options?: PickerOptions
+) => {
+  const rangePicker = new RangePicker(
+    element,
+    label,
+    values,
+    onChange,
+    options
+  );
+  return rangePicker;
+};
 
 export class RangePicker {
   options: PickerOptions = {
@@ -62,13 +109,13 @@ export class RangePicker {
   dragCapturedFrom = 0;
   dragCapturedTo = 0;
 
-  init = (
+  constructor(
     element: HTMLElement,
     label: string,
     values: ValueRange[],
     onChange: (ranges: ValueRange[]) => void,
     options?: PickerOptions
-  ) => {
+  ) {
     if (options) {
       this.options = { ...this.options, ...options };
     }
@@ -87,7 +134,7 @@ export class RangePicker {
       this.rangeEls.push(rangeEl);
     });
     this.update();
-  };
+  }
 
   createRangepicker = (label: string) => {
     const rangepickerEl = document.createElement("div");
@@ -181,8 +228,6 @@ export class RangePicker {
   };
 
   handleValueChange = (index: number, value: ValueRange) => {
-    const popup = this.rangepickerEl!.querySelector(".popup") as HTMLDivElement;
-    popup.classList.remove("transition");
     const newRanges = [...this.ranges];
     newRanges[index] = {
       fromTime: Math.max(value.fromTime, 0),
@@ -228,21 +273,23 @@ export class RangePicker {
     rangeEl.style.width =
       ((toTime - fromTime) * 100) / this.options.total + "%";
     rangeEl.style.left = (fromTime * 100) / this.options.total + "%";
-    rangeEl.querySelector(
-      ".labels .left"
-    )!.innerHTML = this.options.convertFunc(fromTime);
-    rangeEl.querySelector(
+
+    const leftLabel = rangeEl.querySelector(".labels .left") as HTMLDivElement;
+    const rightLabel = rangeEl.querySelector(
       ".labels .right"
-    )!.innerHTML = this.options.convertFunc(toTime);
+    ) as HTMLDivElement;
+
+    leftLabel.innerHTML = this.options.convertFunc(fromTime);
+    rightLabel.innerHTML = this.options.convertFunc(toTime);
     if (rangeEl.clientWidth < 70) {
-      rangeEl.querySelector(".labels .right")!.style.opacity = 0;
+      rightLabel.style.opacity = "0";
     } else {
-      rangeEl.querySelector(".labels .right")!.style.opacity = 1;
+      rightLabel.style.opacity = "1";
     }
     if (rangeEl.clientWidth < 30) {
-      rangeEl.querySelector(".labels .left")!.style.opacity = 0;
+      leftLabel.style.opacity = "0";
     } else {
-      rangeEl.querySelector(".labels .left")!.style.opacity = 1;
+      rightLabel.style.opacity = "1";
     }
   };
 
@@ -343,23 +390,48 @@ export class RangePicker {
   };
 
   update = async () => {
-    this.checkDelete();
-    this.rangeEls.forEach((rangeEl) => {
-      this.handleRangeUpdate(rangeEl);
-    });
-    this.onChange(this.ranges);
-    if (this.focusedRange) {
-      this.rangepickerEl!.querySelector(
-        ".from-value"
-      )!.innerHTML = this.focusedRange.querySelector(
-        ".labels .left"
-      )!.innerHTML;
-      this.rangepickerEl!.querySelector(
-        ".to-value"
-      )!.innerHTML = this.focusedRange.querySelector(
-        ".labels .right"
-      )!.innerHTML;
-      this.handlePopupPosition();
+    if (window.requestAnimationFrame) {
+      window.requestAnimationFrame(() => {
+        this.checkDelete();
+        this.rangeEls.forEach((rangeEl) => {
+          this.handleRangeUpdate(rangeEl);
+        });
+        this.onChange(this.ranges);
+        if (this.focusedRange) {
+          this.rangepickerEl!.querySelector(
+            ".from-value"
+          )!.innerHTML = this.focusedRange.querySelector(
+            ".labels .left"
+          )!.innerHTML;
+          this.rangepickerEl!.querySelector(
+            ".to-value"
+          )!.innerHTML = this.focusedRange.querySelector(
+            ".labels .right"
+          )!.innerHTML;
+          this.handlePopupPosition();
+        }
+      });
+    } else {
+      throttle(() => {
+        this.checkDelete();
+        this.rangeEls.forEach((rangeEl) => {
+          this.handleRangeUpdate(rangeEl);
+        });
+        this.onChange(this.ranges);
+        if (this.focusedRange) {
+          this.rangepickerEl!.querySelector(
+            ".from-value"
+          )!.innerHTML = this.focusedRange.querySelector(
+            ".labels .left"
+          )!.innerHTML;
+          this.rangepickerEl!.querySelector(
+            ".to-value"
+          )!.innerHTML = this.focusedRange.querySelector(
+            ".labels .right"
+          )!.innerHTML;
+          this.handlePopupPosition();
+        }
+      }, 16);
     }
   };
 
@@ -404,18 +476,12 @@ export class RangePicker {
       ?.querySelector(".popup-track")
       ?.classList.remove("closing");
     this.rangepickerEl?.querySelector(".popup-track")?.classList.add("show");
-    const popup = this.rangepickerEl!.querySelector(".popup") as HTMLDivElement;
-    setTimeout(() => {
-      popup.classList.remove("transition");
-    }, 150);
     this.update();
   };
 
   popupCloseTimeout?: any;
 
   handleRangeBlur = (e: FocusEvent) => {
-    const popup = this.rangepickerEl!.querySelector(".popup") as HTMLDivElement;
-    popup.classList.add("transition");
     this.focusedRange = undefined;
     setTimeout(() => {
       if (!this.focusedRange) {

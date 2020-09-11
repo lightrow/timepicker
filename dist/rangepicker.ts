@@ -26,6 +26,23 @@ interface PickerOptions {
   convertFunc: (val: any) => string;
 }
 
+export const init = (
+  element: HTMLElement,
+  label: string,
+  values: ValueRange[],
+  onChange: (ranges: ValueRange[]) => void,
+  options?: PickerOptions
+) => {
+  const rangePicker = new RangePicker(
+    element,
+    label,
+    values,
+    onChange,
+    options
+  );
+  return rangePicker;
+};
+
 class RangePicker {
   options: PickerOptions = {
     readOnly: false,
@@ -33,7 +50,7 @@ class RangePicker {
     total: 1440,
     maxRangesAmount: 2,
     separators: hours,
-    convertFunc: convert
+    convertFunc: convert,
   };
 
   ranges: ValueRange[] = [];
@@ -54,13 +71,13 @@ class RangePicker {
   dragCapturedFrom = 0;
   dragCapturedTo = 0;
 
-  init = (
+  constructor(
     element: HTMLElement,
     label: string,
     values: ValueRange[],
     onChange: (ranges: ValueRange[]) => void,
     options?: PickerOptions
-  ) => {
+  ) {
     if (options) {
       this.options = { ...this.options, ...options };
     }
@@ -74,14 +91,14 @@ class RangePicker {
     ) as HTMLDivElement;
     this.boxElement.addEventListener("pointerdown", this.handleBoxClick);
     this.ranges = values;
-    values.forEach(range => {
+    values.forEach((range) => {
       const rangeEl = this.createRange();
       this.boxElement!.appendChild(rangeEl);
       this.rangeEls.push(rangeEl);
     });
 
     this.update();
-  };
+  }
 
   toggleReadOnly = (readOnly?: boolean) => {
     this.options.readOnly =
@@ -104,7 +121,7 @@ class RangePicker {
     const newRanges = [...this.ranges];
     newRanges[index] = {
       fromTime: Math.max(value.fromTime, 0),
-      toTime: Math.min(value.toTime, this.options.total)
+      toTime: Math.min(value.toTime, this.options.total),
     };
     this.onChange(newRanges);
     this.setRanges(newRanges);
@@ -139,7 +156,7 @@ class RangePicker {
   };
 
   update = () => {
-    this.rangeEls.forEach(rangeEl => {
+    this.rangeEls.forEach((rangeEl) => {
       this.handleRangeUpdate(rangeEl);
     });
   };
@@ -173,7 +190,7 @@ class RangePicker {
 
       this.handleValueChange(index, {
         fromTime: Math.max(0, targetStart - 45),
-        toTime: Math.min(targetStart + 15, this.options.total)
+        toTime: Math.min(targetStart + 15, this.options.total),
       });
 
       this.dragCapturedFrom = this.ranges[index].fromTime;
@@ -213,7 +230,7 @@ class RangePicker {
                 this.options.total,
                 range1.toTime + range2.toTime - range1.fromTime
               ),
-              fromTime: Math.max(0, range2.toTime)
+              fromTime: Math.max(0, range2.toTime),
             });
           } else if (priorityIndex === key1) {
             this.handleValueChange(key2, {
@@ -221,7 +238,7 @@ class RangePicker {
               fromTime: Math.max(
                 0,
                 range2.fromTime - (range2.toTime - range1.fromTime)
-              )
+              ),
             });
           } else if (priorityIndex && priorityIndex > key1) {
             this.handleValueChange(key1, {
@@ -229,7 +246,7 @@ class RangePicker {
                 this.options.total,
                 range1.toTime + range2.toTime - range1.fromTime
               ),
-              fromTime: Math.max(0, range2.toTime)
+              fromTime: Math.max(0, range2.toTime),
             });
           }
         }
@@ -247,7 +264,7 @@ class RangePicker {
         <div class="header-box">
           <div class="headers">
             ${this.options.separators
-              .map(label => {
+              .map((label) => {
                 return `<div class='header'>
                   <span class="header-label">${label}</span>
                 </div>`;
@@ -461,5 +478,4 @@ const getOffset = (el: HTMLElement): { top: number; left: number } => {
   return { top: Y, left: X };
 };
 
-
-export default RangePicker
+export default RangePicker;
