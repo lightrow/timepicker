@@ -114,7 +114,7 @@ export class RangePicker {
     label: string,
     values: ValueRange[],
     onChange: (ranges: ValueRange[]) => void,
-    options?: PickerOptions
+    options?: Partial<PickerOptions>
   ) {
     if (options) {
       this.options = { ...this.options, ...options };
@@ -144,7 +144,9 @@ export class RangePicker {
       <label>${label}</label>
       <div class='outer-box${this.options.readOnly ? " disabled" : ""}'>
         <div class="header-box">
-          <div class="headers">
+          <div class="headers" style="margin:0 -${
+            100 / 4 / this.options.separators.length
+          }%">
             ${this.options.separators
               .map((label) => {
                 return `<div class='header'>
@@ -153,7 +155,9 @@ export class RangePicker {
               })
               .join(" ")}
           </div>
-          <div class="separators">
+          <div class="separators"  style="padding:0 ${
+            100 / 4 / this.options.separators.length
+          }%">
             ${this.options.separators
               .map(() => {
                 return "<div class='separator'></div>";
@@ -161,18 +165,25 @@ export class RangePicker {
               .join(" ")}
           </div>
         </div>
-        <div class="padded-box">
+        <div class="padded-box"  style="padding:0 ${
+          100 / 4 / this.options.separators.length
+        }%">
           <div class="selector-box"></div>
         </div>
       </div>
-      <div class="popup-track">
-        <div class="popup">
-          <p>From:<span class="from-value"></span></p>
-          <p>To:<span class="to-value"></span></p>
-          <button class="btn-remove">Remove</button>
+      <div class="popup-padded-box" style="padding:0 ${
+        100 / 4 / this.options.separators.length
+      }%">
+        <div class="popup-track" >
+          <div class="popup">
+            <p>From:<span class="from-value"></span></p>
+            <p>To:<span class="to-value"></span></p>
+            <button class="btn-remove">Remove</button>
+          </div>
+          <div class="arrow"></div>
         </div>
-        <div class="arrow"></div>
       </div>
+      
       `;
 
     (rangepickerEl.querySelector(
