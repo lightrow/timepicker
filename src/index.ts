@@ -1,4 +1,4 @@
-interface ValueRange {
+export interface ValueRange {
   fromTime: number;
   toTime: number;
 }
@@ -108,6 +108,8 @@ export class RangePicker {
 
   dragCapturedFrom = 0;
   dragCapturedTo = 0;
+
+  creatingNew = false;
 
   constructor(
     element: HTMLElement,
@@ -319,17 +321,30 @@ export class RangePicker {
     if (delta > 0) {
       const deltaPercent = delta / this.boxElement.clientWidth;
       targetStart = this.options.total * deltaPercent;
-      targetStart -= targetStart % this.options.step;
+      const remainder = targetStart % this.options.step;
+      const halfStep = this.options.step / 2;
+      if (remainder < halfStep) {
+        targetStart -= remainder;
+      } else {
+        targetStart -= remainder - this.options.step;
+      }
     }
 
     if (this.ranges.length < this.options.maxRangesAmount) {
+      this.creatingNew = true;
       const rangeEl = this.createRange();
       this.boxElement.appendChild(rangeEl);
       const newRanges = [...this.ranges];
+      // const value = {
+      //   fromTime: Math.max(0, targetStart - 45),
+      //   toTime: Math.min(targetStart + 15, this.options.total),
+      // };
       const value = {
-        fromTime: Math.max(0, targetStart - 45),
-        toTime: Math.min(targetStart + 15, this.options.total),
+        fromTime: targetStart,
+        toTime: targetStart,
       };
+      const index = parseInt(rangeEl.dataset.index!);
+
       let overlap = true;
       while (overlap) {
         let isOverlapping = false;
@@ -358,7 +373,6 @@ export class RangePicker {
       }, 0);
 
       this.rangeEls.push(rangeEl);
-      const index = parseInt(this.draggingEl.dataset.index!);
       this.dragCapturedFrom = this.ranges[index].fromTime;
       this.dragCapturedTo = this.ranges[index].toTime;
       this.lastX = e.clientX;
@@ -393,7 +407,7 @@ export class RangePicker {
   shiftDirection?: string;
 
   wait = () => {
-    return new Promise((resolve) => {
+    return new Promise<void>((resolve) => {
       setTimeout(() => {
         resolve();
       }, 40);
@@ -475,6 +489,7 @@ export class RangePicker {
     if (this.focusedRange) {
       const idx = this.focusedRange.dataset.index as any;
       this.removeRange(idx);
+      this.handleRangeBlur();
     }
   };
 
@@ -492,7 +507,7 @@ export class RangePicker {
 
   popupCloseTimeout?: any;
 
-  handleRangeBlur = (e: FocusEvent) => {
+  handleRangeBlur = () => {
     this.focusedRange = undefined;
     setTimeout(() => {
       if (!this.focusedRange) {
@@ -508,13 +523,65 @@ export class RangePicker {
           popupTrack?.classList.remove("show");
           popup.style.left = "";
           popupArrow.style.left = "";
-        }, 400);
+        }, 300);
       }
     }, 0);
   };
 
   stopDrag = (e?: MouseEvent) => {
     this.dragBuffer = 0;
+    if (this.creatingNew && e && this.draggingEl && this.boxElement) {
+      if (!this.draggingEl.clientWidth) {
+        const delta = e.clientX - getOffset(this.boxElement).left;
+        this.initialMouseX = e.clientX;
+        let targetStart = 0;
+        if (delta > 0) {
+          const deltaPercent = delta / this.boxElement.clientWidth;
+          targetStart = this.options.total * deltaPercent;
+          const remainder = targetStart % this.options.step;
+          const halfStep = this.options.step / 2;
+          if (remainder < halfStep) {
+            targetStart -= remainder;
+          } else {
+            targetStart -= remainder - this.options.step;
+          }
+        }
+        const newRanges = [...this.ranges];
+        const value = {
+          fromTime: Math.max(0, targetStart - 60),
+          toTime: Math.min(targetStart, this.options.total),
+        };
+        const index = parseInt(this.draggingEl.dataset.index!);
+
+        let overlap = true;
+        while (overlap) {
+          let isOverlapping = false;
+          newRanges.forEach((range, i) => {
+            if (i === index) {
+              return;
+            }
+            if (value.fromTime < range.toTime && value.toTime > range.toTime) {
+              isOverlapping = true;
+              range.toTime = value.fromTime;
+            }
+            if (
+              value.toTime > range.fromTime &&
+              value.fromTime < range.toTime
+            ) {
+              isOverlapping = true;
+              range.fromTime = value.toTime;
+            }
+          });
+          if (!isOverlapping) {
+            overlap = false;
+          }
+        }
+        newRanges[index] = value;
+        this.setRanges(newRanges);
+        this.update();
+      }
+    }
+    this.creatingNew = false;
     document.onpointermove = null;
     this.draggingEl = undefined;
     this.checkDelete();
@@ -574,10 +641,18 @@ export class RangePicker {
     }
     const index = parseInt(el.dataset.index!);
     const delta = event.clientX - this.lastX;
-    const deltaPercent = (delta / el.parentElement!.clientWidth) * 100;
+    const deltaPercent = delta / el.parentElement!.clientWidth;
 
-    let deltaValue = (deltaPercent / 100) * this.options.total;
-    deltaValue = deltaValue - (deltaValue % this.options.step);
+    let deltaValue = deltaPercent * this.options.total;
+    const remainder = deltaValue % this.options.step;
+    const halfStep = this.options.step / 2;
+    if (Math.abs(remainder) < halfStep) {
+      deltaValue -= remainder;
+    } else {
+      deltaValue -=
+        remainder + (deltaValue > 0 ? -this.options.step : this.options.step);
+    }
+
     if (
       deltaValue - this.dragBuffer < this.options.step &&
       deltaValue - this.dragBuffer > -this.options.step
@@ -585,6 +660,7 @@ export class RangePicker {
       return;
     }
     this.dragBuffer = deltaValue;
+
     let newStart = this.dragCapturedFrom;
     let newEnd = this.dragCapturedTo;
 
@@ -614,10 +690,18 @@ export class RangePicker {
 
     const index = parseInt(el.dataset.index!);
     const delta = event.clientX - this.lastX;
-    const deltaPercent = (delta / el.parentElement!.clientWidth) * 100;
+    const deltaPercent = delta / el.parentElement!.clientWidth;
 
-    let deltaValue = (deltaPercent / 100) * this.options.total;
-    deltaValue = deltaValue - (deltaValue % this.options.step);
+    let deltaValue = deltaPercent * this.options.total;
+    const remainder = deltaValue % this.options.step;
+    const halfStep = this.options.step / 2;
+    if (Math.abs(remainder) < halfStep) {
+      deltaValue -= remainder;
+    } else {
+      deltaValue -=
+        remainder + (deltaValue > 0 ? -this.options.step : this.options.step);
+    }
+
     if (
       deltaValue - this.dragBuffer < this.options.step &&
       deltaValue - this.dragBuffer > -this.options.step
@@ -625,6 +709,8 @@ export class RangePicker {
       return;
     }
     this.dragBuffer = deltaValue;
+    this.creatingNew = false;
+
     let newStart = this.dragCapturedFrom;
     let newEnd = this.dragCapturedTo;
 
@@ -652,10 +738,18 @@ export class RangePicker {
     }
     const index = parseInt(el.dataset.index!);
     const delta = event.clientX - this.lastX;
-    const deltaPercent = (delta / el.parentElement!.clientWidth) * 100;
+    const deltaPercent = delta / el.parentElement!.clientWidth;
 
-    let deltaValue = (deltaPercent / 100) * this.options.total;
-    deltaValue = deltaValue - (deltaValue % this.options.step);
+    let deltaValue = deltaPercent * this.options.total;
+    const remainder = deltaValue % this.options.step;
+    const halfStep = this.options.step / 2;
+    if (Math.abs(remainder) < halfStep) {
+      deltaValue -= remainder;
+    } else {
+      deltaValue -=
+        remainder + (deltaValue > 0 ? -this.options.step : this.options.step);
+    }
+
     if (
       deltaValue - this.dragBuffer < this.options.step &&
       deltaValue - this.dragBuffer > -this.options.step
@@ -663,6 +757,8 @@ export class RangePicker {
       return;
     }
     this.dragBuffer = deltaValue;
+    this.creatingNew = false;
+
     let newStart = this.dragCapturedFrom + deltaValue;
     let newEnd = this.dragCapturedTo + deltaValue;
 

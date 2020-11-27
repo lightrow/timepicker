@@ -10,7 +10,7 @@ module.exports = {
   devServer: {
     contentBase: `${process.cwd()}/dist`,
     compress: true,
-    port: 3000,
+    port: 3001,
   },
   watch: true,
   module: {
