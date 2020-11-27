@@ -548,8 +548,11 @@ export class RangePicker {
         }
         const newRanges = [...this.ranges];
         const value = {
-          fromTime: Math.max(0, targetStart - 60),
-          toTime: Math.min(targetStart, this.options.total),
+          fromTime: Math.max(0, targetStart),
+          toTime: Math.min(
+            targetStart + this.options.step * 4,
+            this.options.total
+          ),
         };
         const index = parseInt(this.draggingEl.dataset.index!);
 
