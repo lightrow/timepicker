@@ -26,23 +26,6 @@ const convert = (n: number) => {
   return hours + ":" + minutes;
 };
 
-function debounce(func: () => any, wait: number, immediate?: boolean) {
-  var timeout: number | null;
-  return function (this: any) {
-    var context = this,
-      args = arguments;
-    var later = function () {
-      timeout = null;
-      if (!immediate) func.apply(context, args as any);
-    };
-    var callNow = immediate && !timeout;
-    if (timeout) {
-      clearTimeout(timeout);
-    }
-    timeout = window.setTimeout(later, wait);
-    if (callNow) func.apply(context, args as any);
-  };
-}
 function throttle(callback: () => any, limit: number) {
   var waiting = false;
   return function (this: any) {
